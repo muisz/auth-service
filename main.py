@@ -19,8 +19,10 @@ environ.Env.read_env('.env')
 
 app = FastAPI()
 
+DbDep = Annotated[Any, Depends(get_database_connection)]
+
 @app.post('/signup', status_code=status.HTTP_201_CREATED)
-def signup(db: Annotated[Any, Depends(get_database_connection)], payload: AuthRegister, response: Response):
+def signup(db: DbDep, payload: AuthRegister, response: Response):
     try:
         repository = DbAuthRepository(db)
         service = AuthService(repository)
@@ -32,7 +34,7 @@ def signup(db: Annotated[Any, Depends(get_database_connection)], payload: AuthRe
         return ErrorResponse(message=str(error))
 
 @app.post('/signin')
-def signin(db: Annotated[Any, Depends(get_database_connection)], payload: AuthSignin, response: Response):
+def signin(db: DbDep, payload: AuthSignin, response: Response):
     try:
         repository = DbAuthRepository(db)
         service = AuthService(repository)
