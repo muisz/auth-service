@@ -9,9 +9,11 @@ from app.schema import (
     ErrorResponse,
     VerifyTokenRequest,
     TokenValidationResponse,
+    VerifyAccount,
+    OTPRequest,
 )
 from app.repository import DbAuthRepository
-from app.service import AuthService, Jwt
+from app.service import AuthService, Jwt, OTPService
 from app.exception import ClientError
 
 environ.Env()
@@ -61,6 +63,30 @@ def refresh_token(payload: VerifyTokenRequest, response: Response):
         new_token = jwt.refresh(payload.token)
         return new_token
     
+    except ClientError as error:
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return ErrorResponse(message=str(error))
+
+@app.post('/verify')
+def verify(db: DbDep, payload: VerifyAccount, response: Response):
+    try:
+        repository = DbAuthRepository(db)
+        auth_service = AuthService(repository)
+        otp_service = OTPService()
+
+        auth = auth_service.get_auth_by_id(payload.id)
+        if auth is None:
+            raise ClientError('account not found')
+        if auth.is_active:
+            raise ClientError('account is already activated')
+        otp = OTPRequest(code=payload.code, session_code=payload.session_code)
+        if not otp_service.check(otp):
+            raise ClientError('invalid OTP')
+        
+        auth_service.verify(auth)
+        otp_service.invalidate(otp)
+        return
+
     except ClientError as error:
         response.status_code = status.HTTP_400_BAD_REQUEST
         return ErrorResponse(message=str(error))

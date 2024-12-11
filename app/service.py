@@ -1,10 +1,12 @@
 import bcrypt
 import jwt
 import os
+import requests
 from datetime import datetime, timedelta
+from typing import Union
 
 from app.repository import AuthRepository
-from app.schema import AuthRegister, Token
+from app.schema import AuthRegister, Token, OTPRequest
 from app.models import Auth
 from app.exception import ClientError
 
@@ -38,6 +40,13 @@ class AuthService:
         if not auth.is_active:
             raise ClientError('inactive account')
         return auth
+    
+    def verify(self, auth: Auth):
+        auth.is_active = True
+        self.repository.update(auth)
+
+    def get_auth_by_id(self, id: int) -> Union[Auth, None]:
+        return self.repository.get_by_id(id)
 
 class PasswordHasherService:
     @staticmethod
@@ -86,3 +95,27 @@ class Jwt:
             return True
         except Exception:
             return False
+
+
+class OTPServiceBase:
+    def check(self, otp: OTPRequest) -> bool:
+        raise NotImplementedError()
+    
+    def invalidate(self, otp: OTPRequest):
+        raise NotImplementedError()
+
+
+class OTPService(OTPServiceBase):
+    def __init__(self):
+        self.host = os.environ.get('OTP_SERVICE')
+    
+    def check(self, otp: OTPRequest) -> bool:
+        url = f'{self.host}/check'
+        payload = {'code': otp.code, 'session_code': otp.session_code}
+        response = requests.post(url, json=payload)
+        return response.status_code == 200 and response.json().get('valid') is True
+    
+    def invalidate(self, otp: OTPRequest):
+        url = f'{self.host}/invalidate'
+        payload = {'code': otp.code, 'session_code': otp.session_code}
+        requests.post(url, json=payload)

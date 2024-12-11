@@ -22,3 +22,12 @@ class VerifyTokenRequest(BaseModel):
 
 class TokenValidationResponse(BaseModel):
     valid: bool
+
+class OTPRequest(BaseModel):
+    code: str
+    session_code: str
+
+class VerifyAccount(BaseModel):
+    id: int
+    code: str
+    session_code: str
